@@ -9,7 +9,7 @@ services:
       - "1883:1883"
       - "9001:9001"
     volumes:
-      - ./infra/docker/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
 
   # ─── Kafka (Redpanda) ───────────────────────────────────────────────────────
   # Using Redpanda for high performance and zero external dependencies (no Zookeeper)
