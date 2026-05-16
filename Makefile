@@ -11,6 +11,7 @@ help:
 	@echo "  make spoke        Run regional aggregator gateway"
 	@echo "  make cluster      Run latent clustering processor"
 	@echo "  make hub          Run global sample collector"
+	@echo "  make ota          Run OTA rollout orchestrator"
 	@echo "  make test         Run all tests"
 
 setup:
@@ -33,6 +34,9 @@ cluster:
 
 hub:
 	python -m hub.services.collector
+
+ota:
+	python -m hub.services.ota_orchestrator
 
 test:
 	pytest tests/

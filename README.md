@@ -37,10 +37,10 @@ mahoraga/
    make spoke
    ```
 
-4. **Run Mock Edge:**
+4. **Run OTA Orchestrator:**
    ```bash
-   make mock-edge
+   make ota
    ```
 
 ---
-*Status: Infrastructure & Schema Finalized*
+*Status: Architecture Fully Implemented (v1.0.0)*
