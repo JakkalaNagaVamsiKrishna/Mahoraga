@@ -6,8 +6,41 @@ Building upon the foundation of the [Edge-CV-Hub](https://github.com/JakkalaNaga
 
 ## 📂 Project Structure
 
-*   `docs/ARCHITECTURE.md`: High-scale system topology and rollout strategy.
-*   `docs/DHARMA_WHEEL_V1.md`: Initial design for the drift detection and distillation loop.
+```text
+mahoraga/
+├── api/            # Shared schemas and Pydantic models
+├── edge/           # Edge integration & Mock client
+├── spoke/          # Regional Aggregators (MQTT -> Kafka)
+│   ├── clustering/ # DBSCAN latent clustering logic
+│   └── gateway/    # Messaging bridge
+├── hub/            # Global Control Plane (Kubeflow)
+├── infra/          # Docker & Kubernetes configuration
+├── shared/         # Common utilities
+├── Makefile        # Project management commands
+└── requirements.txt
+```
+
+## 🚀 Quick Start
+
+1. **Install Dependencies:**
+   ```bash
+   make setup
+   ```
+
+2. **Start Infrastructure:**
+   ```bash
+   make infra-up
+   ```
+
+3. **Run Spoke Gateway:**
+   ```bash
+   make spoke
+   ```
+
+4. **Run Mock Edge:**
+   ```bash
+   make mock-edge
+   ```
 
 ---
-*Status: Initializing Architecture & Design Phase*
+*Status: Infrastructure & Schema Finalized*

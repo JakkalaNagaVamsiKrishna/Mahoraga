@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Mahoraga Telemetry Message",
+  "description": "Schema for edge-to-cloud telemetry including latent embeddings and uncertainty data.",
+  "type": "object",
+  "properties": {
+    "device_id": {
+      "type": "string",
+      "description": "Unique identifier of the edge device."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "model_version": {
+      "type": "string",
+      "description": "Version of the ONNX model currently running on edge."
+    },
+    "inference": {
+      "type": "object",
+      "properties": {
+        "prediction": { "type": "string" },
+        "confidence": { "type": "number" },
+        "latency_ms": { "type": "number" }
+      },
+      "required": ["prediction", "confidence"]
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "embedding": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "Latent feature vector from the model's penultimate layer."
+        },
+        "image_b64": {
+          "type": "string",
+          "description": "Base64 encoded raw image (included only if high uncertainty)."
+        }
+      },
+      "required": ["embedding"]
+    },
+    "system_stats": {
+      "type": "object",
+      "properties": {
+        "cpu_usage": { "type": "number" },
+        "mem_usage_mb": { "type": "number" }
+      }
+    }
+  },
+  "required": ["device_id", "timestamp", "model_version", "inference", "data"]
+}

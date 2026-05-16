@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # ─── MQTT Broker ────────────────────────────────────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: mahoraga-mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./infra/docker/mosquitto.conf:/mosquitto/config/mosquitto.conf
+
+  # ─── Kafka (Redpanda) ───────────────────────────────────────────────────────
+  # Using Redpanda for high performance and zero external dependencies (no Zookeeper)
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v23.3.1
+    container_name: mahoraga-kafka
+    command:
+      - redpanda start
+      - --overprovisioned
+      - --smp 1
+      - --memory 1G
+      - --reserve-memory 0M
+      - --node-id 0
+      - --check=false
+      - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+
+  # ─── UI for Kafka ───────────────────────────────────────────────────────────
+  console:
+    image: docker.redpanda.com/redpandadata/console:v2.4.3
+    container_name: mahoraga-ui
+    entrypoint: /bin/sh
+    command: -c "echo \"kafka:\n  brokers: [\"redpanda:29092\"]\n\" > /tmp/config.yml; /app/console --config.filepath=/tmp/config.yml"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redpanda
