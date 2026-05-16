@@ -12,17 +12,6 @@ Inspired by the "Eight-Handled Sword Divergent Sila Divine General Mahoraga" fro
 
 ---
 
-## 🎭 The Lore of Adaptation
-
-In JJK, Mahoraga adapts to any attack after the **Dharma Wheel** clicks. In this system, we mirror that cycle:
-
-1.  **The Divergent Sila (Edge):** Edge devices perform **S**calable **I**nference & **L**atent **A**nalysis. When a model encounter OOD (Out-of-Distribution) data, it "clicks."
-2.  **The Wheel Click (Spoke):** Regional aggregators group similar failures using latent clustering.
-3.  **The Adaptation (Hub):** A global control plane triggers automated re-distillation via Kubeflow.
-4.  **The Resolution (OTA):** Updated models are rolled out via an **Eight-Handled Phased Rollout**.
-
----
-
 ## 🏗️ Architecture: The Three-Tier Hierarchy
 
 Mahoraga is built on a distributed **Hub-and-Spoke** topology to handle 10,000+ nodes.
@@ -53,10 +42,44 @@ graph TD
 
 ---
 
+## 🛠️ Implementation Deep-Dive
+
+### 1. The Divergent Sila: Edge-Side Emission
+The Edge Engine (implemented in C++) is the frontline of adaptation. It is designed for zero-downtime and ultra-low latency.
+
+*   **Atomic Hot-Swapping:** Uses `mmap` to map the `.onnx` model files directly into memory. When the "Dharma Wheel" clicks (an update is received via MQTT), the engine loads the new model into a secondary pointer and atomically swaps it, ensuring zero-latency spikes during updates.
+*   **Uncertainty Calculation:** For every inference, the engine calculates the **Entropy** of the softmax output. If `Entropy > Threshold`, it signals that the model is "confused" by the input (OOD data).
+*   **Latent Extraction:** Instead of just sending raw images, it extracts the **Latent Embedding** (the penultimate layer vector). This compressed representation is sent via MQTT to the Spoke for analysis.
+
+### 2. The Wheel Click: Regional Clustering
+The Spoke Aggregator acts as a filter to prevent the Global Hub from being overwhelmed by redundant data (e.g., 10,000 nodes seeing the same new traffic sign).
+
+*   **DBSCAN (Density-Based Clustering):** A Python microservice consumes the Kafka stream of embeddings. It applies DBSCAN with a **Cosine Similarity** metric to group similar "failure modes."
+*   **De-duplication Logic:** 
+    *   **Noise (Anomalies):** Points that don't fit into any cluster are treated as high-priority unique anomalies and forwarded immediately.
+    *   **Core Samples:** For every cluster formed (e.g., a new type of weather condition), only the most representative "Core" samples are forwarded to the Hub, reducing network traffic by up to 95%.
+
+### 3. The Adaptation: Global Hub & Kubeflow
+The Hub is where the "Immunity" is created. It orchestrates the heavy-lifting pipelines on Kubernetes.
+
+*   **Teacher-Student Distillation:** A massive **Teacher Model** (e.g., ViT-Huge) generates high-fidelity pseudo-labels for the new OOD data.
+*   **Continual Learning Pipeline:** The Kubeflow pipeline triggers a re-training session that uses a **Replay Buffer** (combining historical 80% and new OOD 20% data) to prevent "Catastrophic Forgetting."
+*   **Hardware-in-the-Loop (HIL):** Before a model is marked as "Ready," it is automatically benchmarked on physical edge hardware (Raspberry Pi/Jetson) to ensure it still meets the < 50ms latency requirement.
+
+### 4. The Resolution: OTA Orchestration
+The Final stage of the loop handles the secure delivery of the new "Treasure."
+
+*   **Eight-Handled Rollout:** Models are deployed using a phased strategy:
+    1.  **Shadow Mode:** New ONNX model runs silently alongside the old one.
+    2.  **Canary:** Activated on 1% of nodes.
+    3.  **Full Swap:** Once telemetry confirms stability, a `HOT_SWAP` command is broadcasted via MQTT.
+
+---
+
 ## 🛠️ Tech Stack: The Divine Artifacts
 
 -   **D.H.A.R.M.A. Wheel:** **D**istributed **H**euristic **A**daptive **R**e-training **M**anagement **A**rchitecture.
--   **Messaging:** Apache Kafka (High-throughput), Mosquitto MQTT (Lightweight Edge).
+-   **Messaging:** Apache Kafka (High-throughput Hub), Mosquitto MQTT (Lightweight Edge).
 -   **Orchestration:** Kubeflow Pipelines (KFP), FastAPI.
 -   **Storage:** MinIO / AWS S3.
 -   **Clustering:** Scikit-Learn (DBSCAN) for latent space de-duplication.
@@ -69,7 +92,7 @@ graph TD
 ```text
 mahoraga/
 ├── api/            # Pydantic schemas & Protobuf definitions
-├── edge/           # Edge integration & Mock client (SILA Implementation)
+├── edge/           # Edge integration & C++ Engine (SILA Implementation)
 ├── spoke/          # Regional Aggregators (MQTT -> Kafka Bridge)
 │   ├── clustering/ # DBSCAN latent clustering logic (The Wheel Click)
 │   └── gateway/    # Messaging bridge
@@ -102,19 +125,6 @@ Launch the global sample collector and OTA orchestrator:
 make hub
 make ota
 ```
-
----
-
-## 🔄 The Eight-Handled Rollout
-
-To ensure fleet safety, Mahoraga employs a phased deployment strategy:
-
-| Stage | Impact | Description |
-| :--- | :--- | :--- |
-| **Shadow Mode** | 0% | Model runs in background; output logged but not used. |
-| **Canary Release** | 1% | Deployed to a small, diverse subset of nodes. |
-| **Telemetry Gate** | 1% | 24-hour monitoring for latency/crash spikes. |
-| **Phased Expansion** | 10% → 100% | Gradual rollout with automated rollback triggers. |
 
 ---
 
