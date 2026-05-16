@@ -50,7 +50,7 @@ jobs:
         run: |
           docker compose -f infra/docker/docker-compose.yml up -d
           echo "Waiting for Kafka and MQTT to be ready..."
-          sleep 30
+          sleep 35
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -60,32 +60,40 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
         
-      - name: Run Smoke Test Orchestration
+      - name: Run Full Dharma Wheel Turn
         run: |
-          # 1. Start Spoke Gateway in background
+          # 1. Start Spoke Gateway
           python -m spoke.src.gateway.main &
           SPOKE_PID=$!
           
-          # 2. Start Hub Collector in background
+          # 2. Start Hub Collector
           python -m hub.services.collector &
           HUB_PID=$!
           
-          # 3. Run Mock Edge Client for 10 seconds to generate traffic
+          # 3. Start OTA Orchestrator
+          python -m hub.services.ota_orchestrator &
+          OTA_PID=$!
+          
+          sleep 5 # Allow services to bind ports
+          
+          # 4. Generate Traffic from Edge
           timeout 15s python -m edge.src.mock_client || true
           
-          # 4. Cleanup background processes
-          kill $SPOKE_PID $HUB_PID || true
-          
-      - name: Verify Data Persistence
-        run: |
-          # Check if the Hub Collector successfully created the storage directory
+          # 5. Verify Hub Registered Samples
           if [ -d "hub/storage/samples" ]; then
-            echo "✓ Hub storage directory created successfully."
+            echo "✓ Hub captured anomalies."
           else
-            echo "✗ Hub storage directory missing!"
+            echo "✗ No anomalies captured!"
             exit 1
           fi
 
+          # 6. Verify OTA Health
+          curl --fail http://localhost:8000/health || exit 1
+          echo "✓ OTA Orchestrator is healthy."
+          
+          # 7. Cleanup
+          kill $SPOKE_PID $HUB_PID $OTA_PID || true
+          
       - name: Shutdown Infrastructure
         if: always()
         run: docker compose -f infra/docker/docker-compose.yml down
