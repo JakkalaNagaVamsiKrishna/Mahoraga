@@ -34,8 +34,8 @@ services:
   console:
     image: docker.redpanda.com/redpandadata/console:v2.4.3
     container_name: mahoraga-ui
-    entrypoint: /bin/sh
-    command: -c "echo \"kafka:\n  brokers: [\"redpanda:29092\"]\n\" > /tmp/config.yml; /app/console --config.filepath=/tmp/config.yml"
+    environment:
+      - KAFKA_BROKERS=redpanda:29092
     ports:
       - "8080:8080"
     depends_on:
