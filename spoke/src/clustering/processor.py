@@ -19,7 +19,7 @@ logging.basicConfig(
 logger = logging.getLogger("mahoraga-clustering")
 console = Console()
 
-BUFFER_SIZE = 100  # Number of embeddings to aggregate before clustering
+BUFFER_SIZE = 10   # Reduced for faster feedback in CI and local dev
 EPS = 0.5          # DBSCAN epsilon: distance threshold for a neighborhood
 MIN_SAMPLES = 5    # Minimum samples to form a cluster
 

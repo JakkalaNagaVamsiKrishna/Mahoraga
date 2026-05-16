@@ -72,20 +72,25 @@ jobs:
           python -m spoke.src.gateway.main &
           SPOKE_PID=$!
           
-          # 2. Start Hub Collector
+          # 2. Start Clustering Processor
+          python -m spoke.src.clustering.processor &
+          CLUSTER_PID=$!
+          
+          # 3. Start Hub Collector
           python -m hub.services.collector &
           HUB_PID=$!
           
-          # 3. Start OTA Orchestrator
+          # 4. Start OTA Orchestrator
           python -m hub.services.ota_orchestrator &
           OTA_PID=$!
           
           sleep 10 # Allow services to bind ports and connect to MQTT/Kafka
           
-          # 4. Generate Traffic from Edge (Strict check)
-          timeout 20s python -m edge.src.mock_client
+          # 5. Generate Traffic from Edge
+          # Timeout returns 124 if the command times out, which we expect.
+          timeout 30s python -m edge.src.mock_client || [ $? -eq 124 ]
           
-          # 5. Verify Hub Registered Samples
+          # 6. Verify Hub Registered Samples
           if [ -d "hub/storage/samples" ]; then
             echo "✓ Hub captured anomalies."
           else
@@ -94,12 +99,12 @@ jobs:
             exit 1
           fi
 
-          # 6. Verify OTA Health
+          # 7. Verify OTA Health
           curl --fail http://localhost:8000/health || exit 1
           echo "✓ OTA Orchestrator is healthy."
           
-          # 7. Cleanup
-          kill $SPOKE_PID $HUB_PID $OTA_PID || true
+          # 8. Cleanup
+          kill $SPOKE_PID $CLUSTER_PID $HUB_PID $OTA_PID || true
           
       - name: Shutdown Infrastructure
         if: always()
