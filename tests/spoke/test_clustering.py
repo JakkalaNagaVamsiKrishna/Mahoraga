@@ -2,13 +2,13 @@ import pytest
 import numpy as np
 from api.models import TelemetryMessage
 from spoke.src.clustering.processor import perform_clustering
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
 
 def create_mock_telemetry(embedding, confidence=0.9):
     return TelemetryMessage(
         device_id="test-node",
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         model_version="v1.0",
         inference={"prediction": "test", "confidence": confidence},
         data={"embedding": embedding}

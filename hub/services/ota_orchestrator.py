@@ -1,6 +1,8 @@
 import os
 import logging
+import json
 from pathlib import Path
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 import paho.mqtt.client as mqtt
@@ -18,8 +20,6 @@ logging.basicConfig(
 logger = logging.getLogger("mahoraga-ota")
 console = Console()
 
-app = FastAPI(title="Mahoraga OTA Orchestrator")
-
 # Path to the outputs directory where newly distilled models are saved
 MODEL_REGISTRY_DIR = Path("hub/storage/registry")
 MODEL_REGISTRY_DIR.mkdir(parents=True, exist_ok=True)
@@ -30,15 +30,21 @@ MQTT_CONTROL_TOPIC = "mahoraga/control/update"
 
 # ─── MQTT Client ──────────────────────────────────────────────────────────────
 
-mqtt_client = mqtt.Client()
+mqtt_client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
 
-@app.on_event("startup")
-def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Connect MQTT
     try:
         mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
         logger.info(f"[bold green]✓ OTA Orchestrator connected to MQTT at {MQTT_BROKER}[/bold green]", extra={"markup": True})
     except Exception as e:
         logger.error(f"Failed to connect to MQTT: {e}")
+    yield
+    # Shutdown
+    mqtt_client.disconnect()
+
+app = FastAPI(title="Mahoraga OTA Orchestrator", lifespan=lifespan)
 
 # ─── API Endpoints ────────────────────────────────────────────────────────────
 
@@ -68,7 +74,6 @@ async def trigger_rollout(version: str):
         "command": "HOT_SWAP"
     }
 
-    import json
     mqtt_client.publish(MQTT_CONTROL_TOPIC, json.dumps(payload))
     
     logger.info(f"[bold magenta]ROLLOUT TRIGGERED:[/bold magenta] Version {version} pushed to fleet.", extra={"markup": True})

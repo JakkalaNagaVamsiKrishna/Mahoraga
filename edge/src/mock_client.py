@@ -1,7 +1,8 @@
 import json
 import time
 import random
-from datetime import datetime
+from datetime import datetime, timezone
+import numpy as np
 import paho.mqtt.client as mqtt
 from rich.console import Console
 
@@ -10,6 +11,9 @@ console = Console()
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 MQTT_TOPIC = "mahoraga/telemetry/mock-node"
+
+LAST_EMBEDDING = None
+SIMILARITY_THRESHOLD = 0.98
 
 def generate_telemetry():
     """Simulate an edge inference result."""
@@ -22,7 +26,7 @@ def generate_telemetry():
     
     message = {
         "device_id": "mock-edge-001",
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "model_version": "v1.0.0-mock",
         "inference": {
             "prediction": prediction,
@@ -40,8 +44,16 @@ def generate_telemetry():
         
     return message
 
+def calculate_similarity(emb1, emb2):
+    """Simple cosine similarity."""
+    if emb1 is None or emb2 is None: return 0.0
+    a = np.array(emb1)
+    b = np.array(emb2)
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
 def run_mock():
-    client = mqtt.Client()
+    global LAST_EMBEDDING
+    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
     
     try:
         client.connect(MQTT_BROKER, MQTT_PORT, 60)
@@ -52,9 +64,19 @@ def run_mock():
 
     while True:
         data = generate_telemetry()
-        client.publish(MQTT_TOPIC, json.dumps(data))
-        console.print(f"[blue]Sent telemetry for {data['inference']['prediction']} (conf={data['inference']['confidence']:.2f})[/blue]")
-        time.sleep(random.uniform(2, 5))
+        current_emb = data["data"]["embedding"]
+        
+        # Adaptive Sampling Check
+        similarity = calculate_similarity(current_emb, LAST_EMBEDDING)
+        
+        if similarity > SIMILARITY_THRESHOLD:
+            console.print(f"[yellow]Skipping redundant telemetry (similarity={similarity:.4f})[/yellow]")
+        else:
+            client.publish(MQTT_TOPIC, json.dumps(data))
+            console.print(f"[blue]Sent telemetry for {data['inference']['prediction']} (conf={data['inference']['confidence']:.2f})[/blue]")
+            LAST_EMBEDDING = current_emb
+            
+        time.sleep(random.uniform(1, 3))
 
 if __name__ == "__main__":
     run_mock()

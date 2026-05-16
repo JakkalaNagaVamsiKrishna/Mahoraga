@@ -1,7 +1,7 @@
 from __future__ import annotations
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class InferenceResult(BaseModel):
     prediction: str
@@ -18,15 +18,8 @@ class SystemStats(BaseModel):
 
 class TelemetryMessage(BaseModel):
     """The core contract between Edge and Cloud."""
-    device_id: str
-    timestamp: datetime
-    model_version: str
-    inference: InferenceResult
-    data: TelemetryData
-    system_stats: Optional[SystemStats] = None
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "device_id": "edge-node-001",
                 "timestamp": "2026-05-16T17:45:00Z",
@@ -40,3 +33,11 @@ class TelemetryMessage(BaseModel):
                 }
             }
         }
+    )
+
+    device_id: str
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    model_version: str
+    inference: InferenceResult
+    data: TelemetryData
+    system_stats: Optional[SystemStats] = None

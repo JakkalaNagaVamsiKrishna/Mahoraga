@@ -68,7 +68,7 @@ def on_message(client, userdata, msg):
 def run_gateway():
     console.print("[bold blue]Mahoraga Spoke Gateway Starting...[/bold blue]")
     
-    client = mqtt.Client()
+    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
     client.on_connect = on_connect
     client.on_message = on_message
 

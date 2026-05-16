@@ -1,12 +1,12 @@
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 from api.models import TelemetryMessage, InferenceResult, TelemetryData
 
 def test_telemetry_message_valid():
     """Test that a valid telemetry message is correctly parsed."""
     data = {
         "device_id": "test-device",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "model_version": "v1.0",
         "inference": {
             "prediction": "cat",

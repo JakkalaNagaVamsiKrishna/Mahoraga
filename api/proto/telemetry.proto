@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package mahoraga;
+
+import "google/protobuf/timestamp.proto";
+
+message InferenceResult {
+  string prediction = 1;
+  float confidence = 2;
+  float latency_ms = 3;
+}
+
+message TelemetryData {
+  repeated float embedding = 1;
+  bytes image_raw = 2; // Optional raw bytes instead of b64 string
+}
+
+message SystemStats {
+  float cpu_usage = 1;
+  float mem_usage_mb = 2;
+}
+
+message TelemetryMessage {
+  string device_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  string model_version = 3;
+  InferenceResult inference = 4;
+  TelemetryData data = 5;
+  SystemStats system_stats = 6;
+}
