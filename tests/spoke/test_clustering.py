@@ -1,9 +1,8 @@
-import pytest
 import numpy as np
 from api.models import TelemetryMessage
 from spoke.src.clustering.processor import perform_clustering
 from datetime import datetime, timezone
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 def create_mock_telemetry(embedding, confidence=0.9):
     return TelemetryMessage(
@@ -43,17 +42,17 @@ def test_clustering_logic(mock_forward):
     anomaly_count = 0
     for call in mock_forward.call_args_list:
         if len(call.args) > 1:
-            if call.args[1] == True:
+            if call.args[1]:
                 anomaly_count += 1
             else:
                 has_representative = True
         elif 'is_anomaly' in call.kwargs:
-            if call.kwargs['is_anomaly'] == True:
+            if call.kwargs['is_anomaly']:
                 anomaly_count += 1
             else:
                 has_representative = True
     
-    assert has_representative == True
+    assert has_representative
     assert anomaly_count == 5
 
 def test_latent_extraction_numpy():

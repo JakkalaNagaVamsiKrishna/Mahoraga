@@ -1,7 +1,6 @@
-import pytest
 from fastapi.testclient import TestClient
 from hub.services.ota_orchestrator import app, MODEL_REGISTRY_DIR
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import json
 
 client = TestClient(app)

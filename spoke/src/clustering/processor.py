@@ -39,7 +39,8 @@ def run_clustering_processor():
     try:
         while True:
             msg = consumer.poll(1.0)
-            if msg is None: continue
+            if msg is None:
+                continue
             if msg.error():
                 logger.error(f"Consumer error: {msg.error()}")
                 continue
@@ -98,7 +99,8 @@ def perform_clustering(telemetry_list: list[TelemetryMessage]):
             
     # Handle Clusters (Redundancy)
     for label in unique_labels:
-        if label == -1: continue
+        if label == -1:
+            continue
         
         # Find indices of points in this cluster
         indices = np.where(labels == label)[0]

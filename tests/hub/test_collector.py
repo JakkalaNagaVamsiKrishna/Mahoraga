@@ -1,7 +1,4 @@
-import pytest
-import os
 import shutil
-from pathlib import Path
 from hub.services.collector import save_image, STORAGE_DIR
 from unittest.mock import patch
 

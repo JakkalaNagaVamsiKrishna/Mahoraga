@@ -37,7 +37,8 @@ def run_sample_collector():
     try:
         while True:
             msg = consumer.poll(1.0)
-            if msg is None: continue
+            if msg is None:
+                continue
             if msg.error():
                 logger.error(f"Consumer error: {msg.error()}")
                 continue
@@ -100,5 +101,4 @@ def trigger_kubeflow_adaptation():
     logger.info("Pipeline DAG submitted to Kubeflow Controller.")
 
 if __name__ == "__main__":
-    import time # Needed for timestamp
     run_sample_collector()

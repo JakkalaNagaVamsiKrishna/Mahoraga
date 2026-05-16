@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime, timezone
-from api.models import TelemetryMessage, InferenceResult, TelemetryData
+from api.models import TelemetryMessage, InferenceResult
 
 def test_telemetry_message_valid():
     """Test that a valid telemetry message is correctly parsed."""

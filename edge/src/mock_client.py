@@ -46,7 +46,8 @@ def generate_telemetry():
 
 def calculate_similarity(emb1, emb2):
     """Simple cosine similarity."""
-    if emb1 is None or emb2 is None: return 0.0
+    if emb1 is None or emb2 is None:
+        return 0.0
     a = np.array(emb1)
     b = np.array(emb2)
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))

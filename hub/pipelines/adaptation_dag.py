@@ -89,8 +89,8 @@ def mahoraga_adaptation_dag(
     )
     
     # 5. Conditional Deployment
-    with dsl.If(validate_task.outputs['passed'] == True):
-        deploy_task = deploy_to_registry(
+    with dsl.If(validate_task.outputs['passed']):
+        deploy_to_registry(
             onnx_path=distill_task.output,
             version=model_version
         )
