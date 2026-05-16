@@ -32,7 +32,14 @@ def run_sample_collector():
     global anomaly_count
     console.print("[bold red]Mahoraga Global Hub Collector Starting...[/bold red]")
     
-    consumer = get_consumer(group_id="hub-collector-group", topics=[TOPIC_TELEMETRY_CURATED])
+    consumer = None
+    while consumer is None:
+        try:
+            consumer = get_consumer(group_id="hub-collector-group", topics=[TOPIC_TELEMETRY_CURATED])
+            logger.info("✓ Hub Collector subscribed to Kafka.")
+        except Exception as e:
+            logger.warning(f"Kafka connection delayed: {e}. Retrying in 5s...")
+            time.sleep(5)
     
     try:
         while True:
@@ -40,7 +47,12 @@ def run_sample_collector():
             if msg is None:
                 continue
             if msg.error():
-                logger.error(f"Consumer error: {msg.error()}")
+                from confluent_kafka import KafkaError
+                if msg.error().code() == KafkaError.UNKNOWN_TOPIC_OR_PART:
+                    logger.warning("Waiting for Kafka topics to be created...")
+                    time.sleep(5)
+                else:
+                    logger.error(f"Consumer error: {msg.error()}")
                 continue
             
             # 1. Decode Curated Message
