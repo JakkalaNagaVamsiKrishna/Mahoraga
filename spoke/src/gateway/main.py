@@ -5,6 +5,7 @@ from rich.console import Console
 import paho.mqtt.client as mqtt
 
 from api.models import TelemetryMessage
+from shared.kafka_utils import get_producer, delivery_report, TOPIC_TELEMETRY_RAW
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -22,6 +23,9 @@ MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 MQTT_TOPIC = "mahoraga/telemetry/#"
 
+# Initialize Kafka Producer
+producer = get_producer()
+
 # ─── MQTT Callbacks ───────────────────────────────────────────────────────────
 
 def on_connect(client, userdata, flags, rc):
@@ -33,9 +37,11 @@ def on_connect(client, userdata, flags, rc):
 
 def on_message(client, userdata, msg):
     try:
-        payload = json.loads(msg.payload.decode())
+        # Decode and Parse
+        raw_payload = msg.payload.decode()
+        payload = json.loads(raw_payload)
         
-        # 1. Validate against Schema
+        # 1. Validate against Schema (Pydantic)
         telemetry = TelemetryMessage(**payload)
         
         logger.info(
@@ -45,8 +51,14 @@ def on_message(client, userdata, msg):
             extra={"markup": True}
         )
         
-        # 2. To be implemented: Latent Clustering logic
-        # cluster_and_forward(telemetry)
+        # 2. Forward to Kafka for regional aggregation/clustering
+        producer.produce(
+            TOPIC_TELEMETRY_RAW,
+            key=telemetry.device_id,
+            value=telemetry.model_dump_json(),
+            callback=delivery_report
+        )
+        producer.poll(0) # Serve delivery callbacks
         
     except Exception as e:
         logger.error(f"[bold red]Error processing message:[/bold red] {str(e)}", extra={"markup": True})
@@ -65,6 +77,8 @@ def run_gateway():
         client.loop_forever()
     except Exception as e:
         logger.fatal(f"Could not start MQTT client: {e}")
+    finally:
+        producer.flush() # Ensure all Kafka messages are sent before exit
 
 if __name__ == "__main__":
     run_gateway()

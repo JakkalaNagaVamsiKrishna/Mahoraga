@@ -9,7 +9,8 @@ help:
 	@echo "  make infra-down   Stop Infrastructure"
 	@echo "  make mock-edge    Run simulated edge client"
 	@echo "  make spoke        Run regional aggregator gateway"
-	@echo "  make hub          Run global control plane (placeholder)"
+	@echo "  make cluster      Run latent clustering processor"
+	@echo "  make hub          Run global sample collector"
 	@echo "  make test         Run all tests"
 
 setup:
@@ -26,6 +27,12 @@ mock-edge:
 
 spoke:
 	python -m spoke.src.gateway.main
+
+cluster:
+	python -m spoke.src.clustering.processor
+
+hub:
+	python -m hub.services.collector
 
 test:
 	pytest tests/
