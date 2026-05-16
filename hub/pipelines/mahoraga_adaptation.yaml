@@ -1,0 +1,367 @@
+# PIPELINE DEFINITION
+# Name: mahoraga-adaptation-pipeline
+# Description: Automated Dharma Wheel adaptation for Edge-CV models
+# Inputs:
+#    accuracy_target: float [Default: 0.8]
+#    minio_input: str [Default: 's3://mahoraga-ood/latest']
+#    model_version: str [Default: 'v2.0.0']
+components:
+  comp-condition-1:
+    dag:
+      tasks:
+        deploy-to-registry:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-deploy-to-registry
+          inputs:
+            parameters:
+              onnx_path:
+                componentInputParameter: pipelinechannel--run-distillation-Output
+              version:
+                componentInputParameter: pipelinechannel--model_version
+          taskInfo:
+            name: deploy-to-registry
+    inputDefinitions:
+      parameters:
+        pipelinechannel--model_version:
+          parameterType: STRING
+        pipelinechannel--run-distillation-Output:
+          parameterType: STRING
+        pipelinechannel--validate-model-gates-passed:
+          parameterType: BOOLEAN
+  comp-deploy-to-registry:
+    executorLabel: exec-deploy-to-registry
+    inputDefinitions:
+      parameters:
+        onnx_path:
+          parameterType: STRING
+        version:
+          parameterType: STRING
+  comp-ingest-ood-data:
+    executorLabel: exec-ingest-ood-data
+    inputDefinitions:
+      parameters:
+        minio_path:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-run-distillation:
+    executorLabel: exec-run-distillation
+    inputDefinitions:
+      parameters:
+        epochs:
+          defaultValue: 5.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        labeled_dataset:
+          parameterType: STRING
+        pruning_ratio:
+          defaultValue: 0.1
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-teacher-labeling:
+    executorLabel: exec-teacher-labeling
+    inputDefinitions:
+      parameters:
+        dataset_path:
+          parameterType: STRING
+        teacher_arch:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-validate-model-gates:
+    executorLabel: exec-validate-model-gates
+    inputDefinitions:
+      parameters:
+        accuracy_threshold:
+          defaultValue: 0.8
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+        latency_gate_ms:
+          defaultValue: 50.0
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+        onnx_path:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        accuracy:
+          parameterType: NUMBER_DOUBLE
+        passed:
+          parameterType: BOOLEAN
+deploymentSpec:
+  executors:
+    exec-deploy-to-registry:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - deploy_to_registry
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef deploy_to_registry(onnx_path: str, version: str):\n    print(f\"\
+          Pushing {onnx_path} to Model Registry as version {version}...\")\n    print(\"\
+          Sending 'HOT_SWAP' signal to MQTT Control Topic...\")\n\n"
+        image: python:3.10
+    exec-ingest-ood-data:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - ingest_ood_data
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef ingest_ood_data(minio_path: str) -> str:\n    print(f\"Ingesting\
+          \ OOD samples from {minio_path}...\")\n    return \"/tmp/dataset_v2\"\n\n"
+        image: python:3.10
+    exec-run-distillation:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - run_distillation
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef run_distillation(\n    labeled_dataset: str,\n    epochs: int\
+          \ = 5,\n    pruning_ratio: float = 0.1\n) -> str:\n    print(f\"Running\
+          \ Knowledge Distillation for {epochs} epochs...\")\n    # This would call\
+          \ the logic from compressor/pipeline.py\n    return \"/tmp/student_v2.onnx\"\
+          \n\n"
+        image: pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime
+    exec-teacher-labeling:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - teacher_labeling
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef teacher_labeling(dataset_path: str, teacher_arch: str) -> str:\n\
+          \    print(f\"Generating pseudo-labels using {teacher_arch}...\")\n    return\
+          \ f\"{dataset_path}/labeled\"\n\n"
+        image: pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime
+    exec-validate-model-gates:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - validate_model_gates
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef validate_model_gates(\n    onnx_path: str,\n    accuracy_threshold:\
+          \ float = 0.80,\n    latency_gate_ms: float = 50.0\n) -> NamedTuple('Outputs',\
+          \ [('passed', bool), ('accuracy', float)]):\n    print(f\"Validating {onnx_path}\
+          \ against gates...\")\n    # Mocking a successful validation\n    return\
+          \ (True, 0.84)\n\n"
+        image: python:3.10
+pipelineInfo:
+  description: Automated Dharma Wheel adaptation for Edge-CV models
+  name: mahoraga-adaptation-pipeline
+root:
+  dag:
+    tasks:
+      condition-1:
+        componentRef:
+          name: comp-condition-1
+        dependentTasks:
+        - run-distillation
+        - validate-model-gates
+        inputs:
+          parameters:
+            pipelinechannel--model_version:
+              componentInputParameter: model_version
+            pipelinechannel--run-distillation-Output:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: run-distillation
+            pipelinechannel--validate-model-gates-passed:
+              taskOutputParameter:
+                outputParameterKey: passed
+                producerTask: validate-model-gates
+        taskInfo:
+          name: condition-1
+        triggerPolicy:
+          condition: inputs.parameter_values['pipelinechannel--validate-model-gates-passed']
+            == true
+      ingest-ood-data:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-ingest-ood-data
+        inputs:
+          parameters:
+            minio_path:
+              componentInputParameter: minio_input
+        taskInfo:
+          name: ingest-ood-data
+      run-distillation:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-run-distillation
+        dependentTasks:
+        - teacher-labeling
+        inputs:
+          parameters:
+            epochs:
+              runtimeValue:
+                constant: 5.0
+            labeled_dataset:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: teacher-labeling
+            pruning_ratio:
+              runtimeValue:
+                constant: 0.1
+        taskInfo:
+          name: run-distillation
+      teacher-labeling:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-teacher-labeling
+        dependentTasks:
+        - ingest-ood-data
+        inputs:
+          parameters:
+            dataset_path:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: ingest-ood-data
+            teacher_arch:
+              runtimeValue:
+                constant: resnet50
+        taskInfo:
+          name: teacher-labeling
+      validate-model-gates:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-validate-model-gates
+        dependentTasks:
+        - run-distillation
+        inputs:
+          parameters:
+            accuracy_threshold:
+              componentInputParameter: accuracy_target
+            onnx_path:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: run-distillation
+        taskInfo:
+          name: validate-model-gates
+  inputDefinitions:
+    parameters:
+      accuracy_target:
+        defaultValue: 0.8
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      minio_input:
+        defaultValue: s3://mahoraga-ood/latest
+        isOptional: true
+        parameterType: STRING
+      model_version:
+        defaultValue: v2.0.0
+        isOptional: true
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.16.1
