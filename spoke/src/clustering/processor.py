@@ -69,47 +69,51 @@ def perform_clustering(telemetry_list: list[TelemetryMessage]):
     """
     Runs DBSCAN on the latent embeddings and selects representative 'Core' samples for the Hub.
     """
+    if not telemetry_list:
+        logger.warning("Empty batch received for clustering. Skipping.")
+        return
+
     logger.info(f"Processing batch of {len(telemetry_list)} embeddings...")
     
-    # Extract embeddings into a numpy array [N, D]
-    embeddings = np.array([t.data.embedding for t in telemetry_list])
-    
-    # Run DBSCAN
-    clustering = DBSCAN(eps=EPS, min_samples=MIN_SAMPLES, metric='cosine').fit(embeddings)
-    labels = clustering.labels_
-    
-    unique_labels = set(labels)
-    n_clusters = len(unique_labels) - (1 if -1 in labels else 0)
-    n_noise = list(labels).count(-1)
-    
-    logger.info(f"Found {n_clusters} clusters and {n_noise} noise points.")
-    
-    # Selection Logic:
-    #   - For each cluster, send only 1 representative sample to the Hub.
-    #   - For noise points (anomalies), send ALL of them as they might be new failure cases.
-    
-    processed_count = 0
-    
-    # Handle Noise (Anomalies)
-    for i, label in enumerate(labels):
-        if label == -1:
-            # Noise point: High-priority anomaly
-            forward_to_hub(telemetry_list[i], is_anomaly=True)
-            processed_count += 1
-            
-    # Handle Clusters (Redundancy)
-    for label in unique_labels:
-        if label == -1:
-            continue
+    try:
+        # 1. Extract and Validate dimensions
+        embeddings = np.array([t.data.embedding for t in telemetry_list])
         
-        # Find indices of points in this cluster
-        indices = np.where(labels == label)[0]
-        # Just pick the first one as representative (or could pick the one closest to centroid)
-        rep_idx = indices[0]
-        forward_to_hub(telemetry_list[rep_idx], is_anomaly=False)
-        processed_count += 1
+        if embeddings.ndim != 2:
+            logger.error(f"Invalid embedding dimensions: {embeddings.shape}")
+            return
+            
+        # 2. Run DBSCAN
+        clustering = DBSCAN(eps=EPS, min_samples=MIN_SAMPLES, metric='cosine').fit(embeddings)
+        labels = clustering.labels_
+        
+        unique_labels = set(labels)
+        n_clusters = len(unique_labels) - (1 if -1 in labels else 0)
+        n_noise = list(labels).count(-1)
+        
+        logger.info(f"Found {n_clusters} clusters and {n_noise} noise points.")
+        
+        # Handle Noise (Anomalies)
+        processed_count = 0
+        for i, label in enumerate(labels):
+            if label == -1:
+                forward_to_hub(telemetry_list[i], is_anomaly=True)
+                processed_count += 1
+                
+        # Handle Clusters (Redundancy)
+        for label in unique_labels:
+            if label == -1:
+                continue
+            
+            indices = np.where(labels == label)[0]
+            rep_idx = indices[0]
+            forward_to_hub(telemetry_list[rep_idx], is_anomaly=False)
+            processed_count += 1
 
-    logger.info(f"Forwarded {processed_count} curated samples to the Global Hub.")
+        logger.info(f"Forwarded {processed_count} curated samples to the Global Hub.")
+
+    except Exception as e:
+        logger.error(f"Clustering algorithm failure: {e}")
 
 def forward_to_hub(telemetry: TelemetryMessage, is_anomaly: bool):
     """Produces a curated message to the Kafka topic destined for the Global Hub."""

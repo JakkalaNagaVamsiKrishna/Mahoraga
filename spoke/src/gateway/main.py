@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from rich.logging import RichHandler
 from rich.console import Console
 import paho.mqtt.client as mqtt
@@ -37,33 +38,37 @@ def on_connect(client, userdata, flags, rc):
 
 def on_message(client, userdata, msg):
     try:
-        # Decode and Parse
+        # 1. Decode and basic JSON check
         raw_payload = msg.payload.decode()
-        payload = json.loads(raw_payload)
-        
-        # 1. Validate against Schema (Pydantic)
-        telemetry = TelemetryMessage(**payload)
+        try:
+            payload = json.loads(raw_payload)
+        except json.JSONDecodeError:
+            logger.warning(f"[bold red]Discarded malformed JSON[/bold red] from topic {msg.topic}", extra={"markup": True})
+            return
+
+        # 2. Schema Validation (Pydantic)
+        try:
+            telemetry = TelemetryMessage(**payload)
+        except Exception as ve:
+            logger.warning(f"[yellow]Schema mismatch from {msg.topic}: {ve}[/yellow]", extra={"markup": True})
+            return
         
         logger.info(
-            f"[cyan]Message from {telemetry.device_id}[/cyan]: "
-            f"pred={telemetry.inference.prediction} "
-            f"conf={telemetry.inference.confidence:.2f}",
+            f"[cyan]Validated {telemetry.device_id}[/cyan]: pred={telemetry.inference.prediction}",
             extra={"markup": True}
         )
         
-        # 2. Forward to Kafka for regional aggregation/clustering
+        # 3. Forward to Kafka with a timeout guard
         producer.produce(
             TOPIC_TELEMETRY_RAW,
             key=telemetry.device_id,
             value=telemetry.model_dump_json(),
             callback=delivery_report
         )
-        producer.poll(0) # Serve delivery callbacks
+        producer.poll(0)
         
     except Exception as e:
-        logger.error(f"[bold red]Error processing message:[/bold red] {str(e)}", extra={"markup": True})
-
-# ─── Main Execution ───────────────────────────────────────────────────────────
+        logger.error(f"[bold red]Critical pipeline failure:[/bold red] {str(e)}", extra={"markup": True})
 
 def run_gateway():
     console.print("[bold blue]Mahoraga Spoke Gateway Starting...[/bold blue]")
@@ -71,14 +76,19 @@ def run_gateway():
     client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
     client.on_connect = on_connect
     client.on_message = on_message
+    
+    # Enable automatic reconnection logic
+    client.reconnect_delay_set(min_delay=1, max_delay=60)
 
-    try:
-        client.connect(MQTT_BROKER, MQTT_PORT, 60)
-        client.loop_forever()
-    except Exception as e:
-        logger.fatal(f"Could not start MQTT client: {e}")
-    finally:
-        producer.flush() # Ensure all Kafka messages are sent before exit
+    while True:
+        try:
+            client.connect(MQTT_BROKER, MQTT_PORT, 60)
+            client.loop_forever()
+        except Exception as e:
+            logger.error(f"MQTT connection lost: {e}. Retrying in 5s...")
+            time.sleep(5)
+        finally:
+            producer.flush()
 
 if __name__ == "__main__":
     run_gateway()

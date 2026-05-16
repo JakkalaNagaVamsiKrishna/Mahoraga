@@ -1,28 +1,19 @@
-# Mahoraga Dependencies
-
-# ─── Networking & Messaging ─────────────────────────────────────────────────
-paho-mqtt>=1.6.0
-confluent-kafka>=2.3.0
-requests>=2.31.0
-fastapi>=0.110.0
-uvicorn>=0.27.0
-
-# ─── Data Science & ML ──────────────────────────────────────────────────────
-numpy>=1.26.0
-scikit-learn>=1.4.0
-pandas>=2.2.0
-torch>=2.2.0
-onnxruntime>=1.17.0
-protobuf>=4.25.0
-prometheus-client>=0.19.0
-
-# ─── MLOps & Orchestration ──────────────────────────────────────────────────
-kfp>=2.7.0           # Kubeflow Pipelines
-minio>=7.2.0         # For storing OOD samples in the Data Lake
-pydantic>=2.6.0      # Schema validation
-jsonschema>=4.21.0
-
-# ─── Utilities ───────────────────────────────────────────────────────────────
+# ─── Global (Shared) ─────────────────────────────────────────────────────────
+paho-mqtt>=2.1.0
+pydantic>=2.6.0
 python-dotenv>=1.0.1
 pyyaml>=6.0.1
-rich>=13.7.0         # For clean CLI output in logs
+rich>=13.7.0
+
+# ─── Spoke Aggregator ───────────────────────────────────────────────────────
+confluent-kafka>=2.3.0
+numpy>=1.26.0
+scikit-learn>=1.4.0
+
+# ─── Global Hub ─────────────────────────────────────────────────────────────
+fastapi>=0.110.0
+uvicorn>=0.27.0
+httpx>=0.27.0
+kfp>=2.7.0
+minio>=7.2.0
+protobuf>=4.25.0
