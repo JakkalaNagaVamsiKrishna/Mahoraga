@@ -130,11 +130,14 @@ make ota
 
 ## 🖼️ Visualizing the Adaptation
 
-![Mahoraga JJK](https://static.wikia.nocookie.net/jujutsu-kaisen/images/b/b3/Mahoraga_Anime.png/revision/latest?cb=20231118182903)
-
-*Mahoraga adapting to the environment—just as your models adapt to the edge.*
+<p align="center">
+  <img src="./docs/assets/mahoraga.jpg" width="800" alt="Mahoraga Adaptation">
+  <br>
+  <i>"With this treasure, I summon... The Divine General who adapts to any and all phenomena."</i>
+</p>
 
 ---
+
 
 ## 📜 License
 This project is licensed under the **Sila Divine License**. Use responsibly to conquer model drift.
