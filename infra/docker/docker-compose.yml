@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ─── MQTT Broker ────────────────────────────────────────────────────────────
   mosquitto:
@@ -9,7 +7,12 @@ services:
       - "1883:1883"
       - "9001:9001"
     volumes:
-      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-t", "healthcheck", "-n"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # ─── Kafka (Redpanda) ───────────────────────────────────────────────────────
   # Using Redpanda for high performance and zero external dependencies (no Zookeeper)
@@ -18,17 +21,19 @@ services:
     container_name: mahoraga-kafka
     command:
       - redpanda start
-      - --overprovisioned
+      - --kafka-addr internal://0.0.0.0:29092,external://0.0.0.0:9092
+      - --advertise-kafka-addr internal://redpanda:29092,external://localhost:9092
       - --smp 1
       - --memory 1G
-      - --reserve-memory 0M
-      - --node-id 0
-      - --check=false
-      - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
-      - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
+      - --mode dev-container
     ports:
       - "9092:9092"
       - "29092:29092"
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   # ─── UI for Kafka ───────────────────────────────────────────────────────────
   console:
@@ -39,4 +44,5 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - redpanda
+      redpanda:
+        condition: service_healthy

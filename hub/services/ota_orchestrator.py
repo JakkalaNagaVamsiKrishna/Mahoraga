@@ -3,11 +3,15 @@ import logging
 import json
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.responses import FileResponse
+from fastapi.security import APIKeyHeader
 import paho.mqtt.client as mqtt
 from rich.logging import RichHandler
 from rich.console import Console
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -26,11 +30,23 @@ MODEL_REGISTRY_DIR.mkdir(parents=True, exist_ok=True)
 
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = 1883
-MQTT_CONTROL_TOPIC = "mahoraga/control/update"
+# Hierarchical topic structure for better ACL and namespacing
+MQTT_BROADCAST_TOPIC = "mahoraga/ota/broadcast/command"
+
+# Authentication
+API_KEY_HEADER = APIKeyHeader(name="X-API-Key")
+VALID_API_KEY = os.getenv("OTA_API_KEY", "mahoraga-secret-key")
+
+async def verify_api_key(api_key: str = Depends(API_KEY_HEADER)):
+    if api_key != VALID_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not validate credentials"
+        )
 
 # ─── MQTT Client ──────────────────────────────────────────────────────────────
 
-mqtt_client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
+mqtt_client = mqtt.Client()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -57,7 +73,7 @@ async def get_model(version: str):
     
     return FileResponse(path=model_path, filename=f"student_{version}.onnx")
 
-@app.post("/rollout/{version}")
+@app.post("/rollout/{version}", dependencies=[Depends(verify_api_key)])
 async def trigger_rollout(version: str):
     """
     Triggers a fleet-wide update. 
@@ -74,10 +90,10 @@ async def trigger_rollout(version: str):
         "command": "HOT_SWAP"
     }
 
-    mqtt_client.publish(MQTT_CONTROL_TOPIC, json.dumps(payload))
+    mqtt_client.publish(MQTT_BROADCAST_TOPIC, json.dumps(payload))
     
-    logger.info(f"[bold magenta]ROLLOUT TRIGGERED:[/bold magenta] Version {version} pushed to fleet.", extra={"markup": True})
-    return {"status": "success", "pushed_version": version, "target_topic": MQTT_CONTROL_TOPIC}
+    logger.info(f"[bold magenta]ROLLOUT TRIGGERED:[/bold magenta] Version {version} pushed to fleet via {MQTT_BROADCAST_TOPIC}", extra={"markup": True})
+    return {"status": "success", "pushed_version": version, "target_topic": MQTT_BROADCAST_TOPIC}
 
 @app.get("/health")
 def health():

@@ -65,7 +65,7 @@ def mahoraga_adaptation_dag(
     minio_input: str = 's3://mahoraga-ood/latest',
     model_version: str = 'v2.0.0',
     accuracy_target: float = 0.80
-):
+) -> None:
     # 1. Ingest Data
     ingest_task = ingest_ood_data(minio_path=minio_input)
     

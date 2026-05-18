@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from hub.services.ota_orchestrator import app, MODEL_REGISTRY_DIR
+from hub.services.ota_orchestrator import app, MODEL_REGISTRY_DIR, VALID_API_KEY
 from unittest.mock import patch
 import json
 
@@ -35,13 +35,17 @@ def test_rollout_trigger(mock_mqtt):
     model_file = MODEL_REGISTRY_DIR / f"student_{version}.onnx"
     model_file.touch()
     
-    response = client.post(f"/rollout/{version}")
+    # Headers for authentication
+    headers = {"X-API-Key": VALID_API_KEY}
+    
+    response = client.post(f"/rollout/{version}", headers=headers)
     assert response.status_code == 200
     
     # Check if MQTT publish was called
     assert mock_mqtt.publish.called
     topic, payload = mock_mqtt.publish.call_args[0]
-    assert topic == "mahoraga/control/update"
+    # Updated topic for namespacing
+    assert topic == "mahoraga/ota/broadcast/command"
     
     data = json.loads(payload)
     assert data["version"] == version
@@ -50,3 +54,9 @@ def test_rollout_trigger(mock_mqtt):
     
     # Clean up
     model_file.unlink()
+
+def test_rollout_unauthorized():
+    """Verify 403/401 for missing API Key."""
+    version = "test-v2"
+    response = client.post(f"/rollout/{version}")
+    assert response.status_code in [401, 403]

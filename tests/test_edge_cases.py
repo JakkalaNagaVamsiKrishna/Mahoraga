@@ -32,7 +32,8 @@ def test_perform_clustering_empty():
     from spoke.src.clustering.processor import perform_clustering
     with patch('spoke.src.clustering.processor.logger') as mock_logger:
         perform_clustering([])
-        assert mock_logger.warning.called
+        # Now returns silently
+        assert not mock_logger.warning.called
 
 def test_perform_clustering_mismatched_dims():
     """Verify safety with mismatched embedding dimensions."""

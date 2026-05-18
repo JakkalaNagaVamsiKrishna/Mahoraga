@@ -1,4 +1,4 @@
-.PHONY: setup infra-up infra-down mock-edge spoke hub test help
+.PHONY: setup infra-up infra-down mock-edge spoke hub cluster ota test help
 
 help:
 	@echo "Mahoraga: Self-Adaptive ML Orchestration"

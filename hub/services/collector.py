@@ -75,6 +75,9 @@ def run_sample_collector():
                         anomaly_count = 0 # Reset after trigger
                 else:
                     logger.info(f"Routine cluster sample received from {device_id}")
+                
+                # 4. Manual Commit after successful processing (Issue 1.3)
+                consumer.commit(asynchronous=False)
                     
             except Exception as e:
                 logger.error(f"Failed to process curated sample: {e}")

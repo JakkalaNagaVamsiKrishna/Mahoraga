@@ -54,7 +54,10 @@ def calculate_similarity(emb1, emb2):
 
 def run_mock():
     global LAST_EMBEDDING
-    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
+    client = mqtt.Client()
+    
+    # Enable automatic reconnection logic
+    client.reconnect_delay_set(min_delay=1, max_delay=60)
     
     try:
         client.connect(MQTT_BROKER, MQTT_PORT, 60)

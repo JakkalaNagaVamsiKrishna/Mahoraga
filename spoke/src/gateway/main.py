@@ -29,7 +29,7 @@ producer = get_producer()
 
 # ─── MQTT Callbacks ───────────────────────────────────────────────────────────
 
-def on_connect(client, userdata, flags, rc, properties):
+def on_connect(client, userdata, flags, rc):
     if rc == 0:
         logger.info("[bold green]✓ Connected to MQTT Broker[/bold green]", extra={"markup": True})
         client.subscribe(MQTT_TOPIC)
@@ -79,7 +79,7 @@ def run_gateway():
     except Exception as e:
         logger.warning(f"Initial topic creation failed: {e}. Will retry on produce.")
 
-    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
+    client = mqtt.Client()
     client.on_connect = on_connect
     client.on_message = on_message
     
